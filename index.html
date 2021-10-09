@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Portal Chess</title>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="css/reset.css">
+        <link rel="stylesheet" href="css/normalize.css">
+        <script src="https://unpkg.com/vue@next"></script>
+    </head>
+    <body>
+        <div id="app">
+            <div id="board">
+                <div v-for="count in 64"
+                    :key="count"
+                    :class="{
+                        'selected': moves.square === count - 1,
+                        'w': Math.trunc((count - 1) / 8) % 2 === (count - 1) % 8 % 2,
+                        'b': Math.trunc((count - 1) / 8) % 2 !== (count - 1) % 8 % 2,
+                        'in-check':
+                            board !== undefined &&
+                            board.board[count - 1].name === 'King' &&
+                            board.inCheck === board.board[count - 1].color,
+                        'portal-selecting':
+                            board !== undefined &&
+                            portalPlacement.placing &&
+                            board.board[count - 1] === '' &&
+                            ((gamedata.color === 'b' && count <= 32) ||
+                            (gamedata.color === 'w' && count > 32)) &&
+                            !portalPlacement.selected.has(count - 1),
+                        'portal-selected':
+                            portalPlacement.selected.has(count - 1),
+                    }"
+                    @click="handleSquareClick(count - 1)"
+                >
+                    <div
+                        id="promotion-dialog"
+                        v-show="promotion.promoting === count - 1"
+                        :class="{
+                            'w': Math.trunc((count - 1) / 8) % 2 === (count - 1) % 8 % 2,
+                            'b': Math.trunc((count - 1) / 8) % 2 !== (count - 1) % 8 % 2,
+                        }"
+                    >
+                        <div @click="promotion.promotionChoice = 'Q'">
+                            <img :src="`pieces/${gamedata.color}Q.png`">
+                        </div>
+                        <div @click="promotion.promotionChoice = 'R'">
+                            <img :src="`pieces/${gamedata.color}R.png`">
+                        </div>
+                        <div @click="promotion.promotionChoice = 'B'">
+                            <img :src="`pieces/${gamedata.color}B.png`">
+                        </div>
+                        <div @click="promotion.promotionChoice = 'N'">
+                            <img :src="`pieces/${gamedata.color}N.png`">
+                        </div>
+                    </div>
+                    <img class="piece"
+                        :class="(board !== undefined && board.board[count - 1] !== '')
+                            ? board.board[count - 1].name.toLowerCase()
+                            : ''"
+                        v-if="board !== undefined && board.board[count - 1] !== ''"
+                        :src="pieceToImageUrl(board.board[count - 1])">
+                    <div class="movable"
+                        :class="{
+                            'capturable': board !== undefined && board.board[count - 1] !== ''
+                        }"
+                        v-show="moves.movable.includes(count - 1)"
+                    ></div>
+                </div>
+            </div>
+            <div id="info">
+                <div id="gamedata">
+                    <input placeholder="Game Code" v-model="gamedata.code" v-if="!gamedata.submitted" @keyup.enter="submitCode">
+                    <p class="gamecode" v-show="gamedata.submitted">Game: <span class="bold">{{ gamedata.code }}</span></p>
+                    <p class="color joined" v-show="gamedata.submitted">You play <span class="bold">{{ gamedata.color === "w" ? "White" : "Black" }}</span></p>
+                    <p class="color not-joined" v-show="!gamedata.submitted">You haven't joined a game.</p>
+                </div>
+                <!-- this divider will show up if any of the divs below are visible -->
+                <div class="h-divider" v-show="statusMessage[0] !== '' || gamedata.status[0] === 'playing'"></div>
+                <div id="status" v-show="statusMessage[0] !== ''">
+                    <div>
+                        {{ statusMessage[0] }}
+                    </div>
+                    <div>
+                        {{ statusMessage[1] }}
+                    </div>
+                </div>
+                <div id="place-portals"
+                    v-show="gamedata.status[0] === 'playing'"
+                    @click="togglePortalSelection()"
+                    :class="{
+                        'disabled': !portalPlaceable,
+                        'portal-selecting': portalPlacement.placing,
+                    }"
+                >
+                    <img src="/icons/portal.svg">
+                    {{ portalPlacement.placing ? "SELECT LOCATIONS" : "PLACE PORTALS" }}
+                </div>
+                <div class="h-divider" v-show="statusMessage[0] !== '' || gamedata.status[0] === 'playing'"></div>
+                <div id="quit-buttons"
+                    v-show="gamedata.status[0] === 'playing'"
+                >
+                    <div class="background resign"
+                        :class="{
+                            clicked: quitButtons.resign && !quitButtons.draw,
+                        }"
+                    ></div>
+                    <div class="background offer-draw"
+                        :class="{
+                            clicked: quitButtons.draw && !quitButtons.resign,
+                        }"
+                        v-show="!drawOffer.offered"
+                    ></div>
+                    <div class="button resign"
+                        @click="handleQuitButtons('resign')"
+                        :class="{
+                            clicked: quitButtons.resign,
+                            hidden: quitButtons.draw,
+                        }"
+                    >
+                        <!-- resign flag by Victoruler from the Noun Project -->
+                        <img src="/icons/resign_flag.svg">
+                        <span>{{ resignButtonText }}</span>
+                        <div class="offer-draw confirm"
+                            :class="{
+                                hidden: !quitButtons.draw
+                            }"
+                        >
+                            <div @click.stop="handleQuitButtons('draw', true)">
+                                <!-- Check by Zach Bogart from the Noun Project -->
+                                <img src="/icons/check.svg">
+                            </div>
+                            <div @click.stop="handleQuitButtons('draw', false)">
+                                <!-- Error by Zach Bogart from the Noun Project -->
+                                <img src="/icons/cross.svg">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="button offer-draw"
+                        @click="handleQuitButtons('draw')"
+                        :class="{
+                            clicked: quitButtons.draw,
+                            hidden: quitButtons.resign,
+                        }"
+                        v-show="!drawOffer.offered"
+                    >
+                        <!-- Handshake by royyanandrian from the Noun Project -->
+                        <img src="/icons/handshake.svg">
+                        <span>{{ offerDrawButtonText }}</span>
+                        <div class="resign confirm"
+                            :class="{
+                                hidden: !quitButtons.resign
+                            }"
+                        >
+                            <div @click.stop="handleQuitButtons('resign', true)">
+                                <!-- Check by Zach Bogart from the Noun Project -->
+                                <img src="/icons/check.svg">
+                            </div>
+                            <div @click.stop="handleQuitButtons('resign', false)">
+                                <!-- Error by Zach Bogart from the Noun Project -->
+                                <img src="/icons/cross.svg">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="draw-offer-received"
+                    v-show="canViewDrawOffer"
+                >
+                    <div class="background">
+                    </div>
+                    <div class="main">
+                        <p>Your opponent offers a draw!</p>
+                        <div class="confirm">
+                            <div @click.stop="handleDrawOfferReceipt(true)">
+                                <img src="/icons/check.svg">
+                            </div>
+                            <div @click.stop="handleDrawOfferReceipt(false)">
+                                <img src="/icons/cross.svg">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <style>
+            .bold {
+                font-size: 1.25em;
+                font-weight: 600;
+            }
+
+            body {
+                background-color: #272727;
+                font-family: "Montserrat", sans-serif;
+                padding: 20px 50px;
+            }
+
+            #app {
+                display: flex;
+                flex-flow: row wrap;
+                justify-content: center;
+                align-items: center;
+            }
+            
+            #board {
+                height: calc(100vh - 150px);
+                width: calc(100vh - 150px);
+                margin: 50px;
+                display: grid;
+                grid-template-columns: repeat(8, 1fr);
+                grid-template-rows: repeat(8, 1fr);
+                gap: 0;
+                grid-auto-flow: row;
+                /* border: 2px solid #485D83; */
+                box-shadow: -1px -1px 20px 2px #485d8380;
+            }
+
+            #board > div {
+                height: 100%;
+                width: 100%;
+                position: relative;
+            }
+
+            #board > div > * {
+                position: absolute;
+            }
+
+            #board div.w {
+                background-color: #C0C0C0;
+            }
+            
+            #board div.b {
+                background-color: #485D83;
+            }
+
+            #board > div.w.portal-selecting {
+                background-color: #b9ec9c;
+            }
+
+            #board > div.b.portal-selecting {
+                background-color: #48834d;
+            }
+
+            #board > div.portal-selected {
+                background-color: #2b5029;
+            }
+
+            #board > div.in-check {
+                background-image: radial-gradient(transparent 0%, #690711 80%);
+            }
+
+            #board > div.selected {
+                background-color: #5F97FF;
+            }
+
+            .piece {
+                height: 94%;
+                width: 94%;
+                margin: 3%;
+                z-index: 0;
+            }
+
+            .movable {
+                height: 22%;
+                width: 22%;
+                margin: 39%;
+                border-radius: 10px;
+                background-color: #1c3a02;
+                z-index: 1;
+            }
+
+            .movable.capturable {
+                background-color: #690711;
+            }
+
+            #board > div > #promotion-dialog {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-rows: repeat(2, minmax(0, 1fr));
+                gap: 0;
+                grid-auto-flow: row;
+                z-index: 10;
+                max-height: 100%;
+                max-width: 100%;
+            }
+            
+            #promotion-dialog div:first-child(1),div:last-child(4) {
+                background-color: #485D83;
+            }
+
+            #promotion-dialog div img {
+                width: 100%;
+                height: 100%;
+            }
+
+            @keyframes portal-spin {
+                from {
+                    transform: rotate(0deg);
+                }
+
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            .portal {
+                animation-name: portal-spin;
+                animation-duration: 10s;
+                animation-timing-function: linear;
+                animation-iteration-count: infinite;
+            }
+
+            #info {
+                overflow: hidden;
+                background-color: #3C3C3C;
+                width: 320px;
+                margin: 50px 0;
+                padding: 20px;
+                border-radius: 8px;
+            }
+
+            #gamedata {
+                margin: 0 0 10px;
+            }
+
+            #gamedata input {
+                display: block;
+                width: 100%;
+                margin-bottom: 16px;
+                color: #C0C0C0;
+                background-color: transparent;
+                outline: none;
+                border: none;
+                border-bottom: 1px solid #C0C0C0;
+                border-radius: 2px;
+            }
+
+            #gamedata input:focus {
+                border-bottom-color: #92B1EB;
+            }
+
+            #gamedata p.gamecode {
+                margin-bottom: 10px;
+                font-size: 14px;
+                font-weight: 400;
+                color: #E1E1E1;
+            }
+
+            #gamedata p.color.joined {
+                margin-bottom: 16px;
+                font-size: 18px;
+                color: #E1E1E1;
+            }
+
+            #gamedata p.color.not-joined {
+                font-size: 16px;
+                font-weight: 500;
+                color: #F18994;
+            }
+
+            .h-divider {
+                margin: 16px 0;
+                height: 2px;
+                background-color: #616161;
+                border-radius: 1px;
+            }
+
+            #status div:first-child {
+                margin: 6px 0 16px;
+                font-size: 26px;
+                line-height: 30px;
+                font-weight: 700;
+                color: #E1E1E1;
+            }
+
+            #status div:last-child {
+                margin-bottom: 10px;
+                font-size: 16px;
+                line-height: 20px;
+                font-weight: 500;
+                color: #E1E1E1;
+            }
+
+            #place-portals {
+                padding: 4px 10px;
+                line-height: 30px;
+                background-color: #204486;
+                color: white;
+                text-align: center;
+                font-size: 14px;
+                font-weight: 500;
+                border-radius: 4px;
+                box-shadow: 0px 4px 10px 0px #30303040;
+                cursor: pointer;
+            }
+
+            #place-portals img {
+                vertical-align: middle;
+                margin: 3px 5px 3px 0;
+            }
+
+            #place-portals.disabled {
+                background-color: #616161;
+            }
+
+            #place-portals.portal-selecting {
+                background-color: #3c8100;
+            }
+
+            #quit-buttons {
+                position: relative;
+                height: 60px;
+                display: flex;
+                flex-flow: row;
+                justify-content: space-evenly;
+                align-items: center;
+                color: white;
+            }
+
+            #quit-buttons > div {
+                transition: transform 0.3s, background-color 0.3s;
+            }
+
+            #quit-buttons div.button {
+                height: 30px;
+                padding: 4px 10px;
+                text-align: center;
+                border-radius: 4px;
+                box-shadow: 0px 4px 10px 0px #30303040;
+                z-index: 2;
+            }
+
+            #quit-buttons div.button.hidden {
+                visibility: hidden;
+            }
+
+            #quit-buttons div.button.resign {
+                background-color: #9B0D1B;
+            }
+
+            #quit-buttons div.button.offer-draw {
+                background-color: #9D6803;
+            }
+
+            #quit-buttons div.button img {
+                height: 26px;
+                margin: 3px 5px 3px 0;
+                vertical-align: middle;
+            }
+            
+            #quit-buttons div.button.clicked {
+                background-color: transparent;
+                box-shadow: unset;
+            }
+
+            #quit-buttons div.button div.confirm {
+                position: absolute;
+                visibility: visible;
+                display: flex;
+                flex-flow: row;
+                top: 11px;
+                transition: opacity 0.3s;
+                z-index: 3;
+            }
+
+            #quit-buttons div.button div.confirm.resign {
+                right: 30px;
+            }
+
+            #quit-buttons div.button div.confirm.offer-draw {
+                left: 30px;
+            }
+
+            #quit-buttons div.button div.confirm.hidden {
+                opacity: 0;
+                z-index: -1;
+            }
+
+            #quit-buttons div.button div.confirm img {
+                height: 38px;
+                width: 38px;
+                margin: 0;
+            }
+
+            #quit-buttons div.background {
+                position: absolute;
+                left: 0;
+                top: 11px;
+                width: 2px;
+                height: 38px;
+                transition: transform 0.3s;
+                transform: translateX(-1100%);
+                transform-origin: left;
+            }
+
+            #quit-buttons div.background.resign {                
+                background-color: #9B0D1B80;
+            }
+
+            #quit-buttons div.background.offer-draw {
+                background-color: #9D680380;
+            }
+
+            #quit-buttons div.background.clicked {
+                transition: transform 0.3s;
+                transform: translateX(-1100%) scaleX(185);
+            }
+
+            #draw-offer-received {
+                position: relative;
+                height: 100px;
+                width: 100%;
+                transform: scaleY(100%);
+            }
+
+            #draw-offer-received .background {
+                position: absolute;
+                height: 100%;
+                width: 100%;
+                transform: scaleX(120%);
+                background-color: #9D680380;
+            }
+
+            #draw-offer-received .main {
+                position: absolute;
+                height: 100%;
+                width: 100%;
+                padding: 20px;
+                box-sizing: border-box;
+            }
+
+            #draw-offer-received .main p {
+                color: white;
+                font-weight: 600;
+                font-size: 18px;
+                text-align: center;
+            }
+
+            #draw-offer-received .main div {
+                height: 38px;
+                width: 38px;
+            }
+        </style>
+        <script defer src="chess_pieces.js"></script>
+        <script defer src="vue_portal_chess.js"></script>
+    </body>
+</html>
