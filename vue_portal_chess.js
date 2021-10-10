@@ -115,7 +115,7 @@ const Chess = {
     },
     methods: {
         connectWS() {
-            this.ws = new WebSocket("wss://portalchess.herokuapp.com:8080");
+            this.ws = new WebSocket(`wss://0.0.0.0:${process.env.PORT}`);
 
             this.ws.onopen = () => {
                 console.log("Connected!");
