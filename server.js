@@ -1,4 +1,6 @@
 const ws = require("ws");
+const express = require("express");
+const path = require("path");
 
 let games = {
     "test": {
@@ -15,8 +17,21 @@ let games = {
     }
 };
 
+const PORT = process.env.PORT || 8080;
+const INDEX = path.join(__dirname, 'index.html');
+
+const server = express()
+    .get("/", (req, res) => {
+        res.sendFile(INDEX);
+    })
+    .use("/js", express.static(path.join(__dirname, "js")))
+    .use("/css", express.static(path.join(__dirname, "css")))
+    .use("/pieces", express.static(path.join(__dirname, "pieces")))
+    .use("/icons", express.static(path.join(__dirname, "icons")))
+    .listen(PORT, () => console.log(`Listening on ${PORT}`));
+
 const wss = new ws.Server({
-    port: process.env.PORT || 8080,
+    server: server
 });
 
 /*
