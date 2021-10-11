@@ -164,7 +164,7 @@ wss.on("connection", (ws) => {
         let data = JSON.parse(msg);
         if (!Object.keys(games).includes(data.code)) {
             games[data.code] = {
-                fen: "8/1PK5/8/8/8/8/2p5/2k5 w - - 0 1",
+                fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
                 status: {
                     current: "NOT STARTED",
                     result: undefined,
@@ -240,6 +240,19 @@ wss.on("connection", (ws) => {
                 games[data.code].status.result = [data.winner, data.result];
                 oppositeColor = (data.color === "w") ? "b" : "w";
                 players[oppositeColor].send(JSON.stringify(data));
+
+                games[data.code] = {
+                    fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                    status: {
+                        current: "NOT STARTED",
+                        result: undefined,
+                    },
+                    players: {
+                        "w": undefined,
+                        "b": undefined
+                    },
+                    moves: [],
+                };
                 break;
         }
     });
