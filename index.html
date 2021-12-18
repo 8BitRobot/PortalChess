@@ -141,11 +141,10 @@
                             clicked: quitButtons.draw,
                             hidden: quitButtons.resign,
                         }"
-                        v-show="!drawOffer.offered"
                     >
                         <!-- Handshake by royyanandrian from the Noun Project -->
-                        <img src="/icons/handshake.svg">
-                        <span>{{ offerDrawButtonText }}</span>
+                        <img src="/icons/handshake.svg" v-show="canOfferDraw">
+                        <span v-show="canOfferDraw">{{ offerDrawButtonText }}</span>
                         <div class="resign confirm"
                             :class="{
                                 hidden: !quitButtons.resign
@@ -534,7 +533,14 @@
                 text-align: center;
             }
 
-            #draw-offer-received .main div {
+            #draw-offer-received .main > div {
+                display: flex;
+                justify-content: space-evenly;
+                flex-flow: row;
+                margin-top: 10px;
+            }
+
+            #draw-offer-received .main div div {
                 height: 38px;
                 width: 38px;
             }

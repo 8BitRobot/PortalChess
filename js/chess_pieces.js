@@ -573,7 +573,6 @@ class Pawn {
     color;
     name = "Pawn";
     moves = [];
-    movesOnlyAttack = [];
     id;
 
     constructor (square, color) {
@@ -582,11 +581,9 @@ class Pawn {
         this.id = (this.color === "w") ? "P" : "p";
     }
 
-    generateMoves(gameboard, onlyAttack = false) {
+    calculateMoves(gameboard, onlyAttack = false) {
         if (this.square === -1) {
-            this.moves = [];
-            this.movesOnlyAttack = [];
-            return;
+            return [];
         }
 
         let movableSquares = [];
@@ -596,20 +593,43 @@ class Pawn {
 
         let moveDirection = (this.color === "w") ? 1 : -1;
 
+        if (onlyAttack) {
+            if (this.color === "w") {
+                if (this.square % 8 === 0) {
+                    movableSquares = [this.square - 7];
+                } else if (this.square % 8 === 7) {
+                    movableSquares = [this.square - 9];
+                } else {
+                    movableSquares = [this.square - 7, this.square - 9];
+                }
+            } else {
+                if (this.square % 8 === 0) {
+                    movableSquares = [this.square + 9];
+                } else if (this.square % 8 === 7) {
+                    movableSquares = [this.square + 7];
+                } else {
+                    movableSquares = [this.square + 7, this.square + 9];
+                }
+            }
+            return movableSquares;
+        }
+
         let actualCurrentSquare = this.square;
         let pieceSquareReference;
         let boardSquareReference;
 
         let currentPosition = this.square - 9 * moveDirection; // capturing along a8-h1 diagonal
+        let [epSquare, epColor] = gameboard.enPassantable;
         if (
             (
                 (this.color === "w" && actualCurrentSquare % 8 !== 0) ||
                 (this.color === "b" && actualCurrentSquare % 8 !== 7)
             ) && (
                 (gameboard.board[currentPosition] !== "" && gameboard.board[currentPosition].color !== this.color) ||
-                gameboard.enPassantable === currentPosition
+                (epSquare === currentPosition && epColor === this.color)
             )
         ) {
+            console.log("Got here! 613");
             boardSquareReference = gameboard.board[currentPosition];
             if (boardSquareReference !== "") {
                 pieceSquareReference = boardSquareReference.square;
@@ -640,9 +660,10 @@ class Pawn {
                 (this.color === "b" && actualCurrentSquare % 8 !== 0)
             ) && (
                 (gameboard.board[currentPosition] !== "" && gameboard.board[currentPosition].color !== this.color) ||
-                gameboard.enPassantable === currentPosition
+                (epSquare === currentPosition && epColor === this.color)
             )
         ) {
+            console.log("Got here! 647");
             boardSquareReference = gameboard.board[currentPosition];
             if (boardSquareReference !== "") {
                 pieceSquareReference = boardSquareReference.square;
@@ -665,11 +686,8 @@ class Pawn {
             gameboard.board[this.square] = this;
             gameboard.board[currentPosition] = boardSquareReference;
         }
-
-        this.movesOnlyAttack = movableSquares;
-
         if (onlyAttack) {
-            return;
+            return movableSquares;
         }
 
         let isNotBlocked = false;
@@ -757,7 +775,11 @@ class Pawn {
             }
         }
 
-        this.moves = movableSquares;
+        return movableSquares;
+    }
+
+    generateMoves(gameboard) {
+        this.moves = this.calculateMoves(gameboard, false);
     }
 }
 
@@ -930,7 +952,7 @@ class Board {
             "bK": fen[2].includes("k"),
             "bQ": fen[2].includes("q"),
         };
-        this.enPassantable = (fen[3] !== "-") ? this.coordToNum(fen[3]) : -1;
+        this.enPassantable = (fen[3] !== "-") ? [ this.coordToNum(fen[3]), this.turn ] : [-1, ""];
         this.halfMoveClock = parseInt(fen[4]);
         this.fullMoveCount = parseInt(fen[5]);
 
@@ -1067,8 +1089,7 @@ class Board {
         for (let [id, instances] of Object.entries(this.pieces[byColor])) {
             if (id === "P") { // manually check diagonal captures
                 for (let piece of instances) {
-                    piece.generateMoves(this, true);
-                    let moves = piece.movesOnlyAttack;
+                    let moves = piece.calculateMoves(this, true);
                     if (moves.includes(square)) {
                         return true;
                     }
@@ -1230,7 +1251,7 @@ class Board {
         }
 
         let capturedPiece = this.board[squareTo];
-        if (piece.name === "Pawn" && squareTo === this.enPassantable) {
+        if (piece.name === "Pawn" && squareTo === this.enPassantable[0] && piece.color === this.enPassantable[1]) {
             if (this.turn === "w") {
                 capturedPiece = this.board[squareTo + 8];
                 this.board[squareTo + 8] = "";
@@ -1305,11 +1326,11 @@ class Board {
 
         if (piece.name === "Pawn") { // record en passant square and handle promotion
             if (piece.color === "w" && squareFrom - squareTo === 16) {
-                this.enPassantable = squareFrom - 8;
+                this.enPassantable = [squareFrom - 8, oppositeTurn];
             } else if (piece.color === "b" && squareFrom - squareTo === -16) {
-                this.enPassantable = squareFrom + 8;
+                this.enPassantable = [squareFrom + 8, oppositeTurn];
             } else {
-                this.enPassantable = -1;
+                this.enPassantable = [-1, ""];
             }
             
             if (
@@ -1326,7 +1347,7 @@ class Board {
                 moveObject.special = `Promotion ${promotion.toUpperCase()}`;
             }
         } else {
-            this.enPassantable = -1;
+            this.enPassantable = [-1, ""];
         }
 
         // detect and report check

@@ -97,8 +97,14 @@ const Chess = {
                 return [""];
             }
         },
+        canOfferDraw() {
+            return !this.drawOffer.offered ||
+                this.board.fullMoveCount > this.drawOffer.offeredOnMove + 14;
+        },
         canViewDrawOffer() {
-            return this.drawOffer.received && this.drawOffer.receivedStatus === "waiting" && this.board.fullMoveCount < this.drawOffer.receivedOnMove + 4;
+            return this.drawOffer.received &&
+                this.drawOffer.receivedStatus === "waiting" &&
+                this.board.fullMoveCount < this.drawOffer.receivedOnMove + 4;
         },
         canViewDrawOfferListener() {
             let offer = this.canViewDrawOffer;
@@ -115,7 +121,8 @@ const Chess = {
     },
     methods: {
         connectWS() {
-            this.ws = new WebSocket(location.origin.replace(/^http/, "ws"));
+            this.ws = new WebSocket("ws://localhost:8080");
+            // this.ws = new WebSocket(location.origin.replace(/^http/, "ws"));
 
             this.ws.onopen = () => {
                 console.log("Connected!");
@@ -169,6 +176,7 @@ const Chess = {
                         console.log("The game is over!");
                         let victory = (this.gamedata.color === data.winner) ? "win" : (data.winner === "-") ? "draw" : "loss";
                         this.gamedata.status = ["finished", victory, data.result];
+                        this.resetGameDefaults();
                         break;
                     
                     case "DR?":
@@ -180,6 +188,9 @@ const Chess = {
                 
                     case "DR!":
                         this.drawOffer.offerStatus = data.response;
+                        if (data.response === "ignored" || data.response === "rejected") {
+                            this.quitButtons.draw = false;
+                        }
                         break;
                 }
             }
@@ -223,7 +234,7 @@ const Chess = {
                     }
                 }
             } else if (button === "draw") {
-                if (!this.quitButtons.resign) {
+                if (!this.quitButtons.resign && this.canOfferDraw) {
                     if (!this.quitButtons.draw && confirm === undefined) {
                         this.quitButtons.draw = true;
                     } else if (this.quitButtons.draw && confirm) {
@@ -358,11 +369,7 @@ const Chess = {
             }
         },
         togglePortalSelection() {
-            if (
-                this.canMove &&
-                this.board.pieces[this.gamedata.color]["O"][0].active &&
-                this.board.pieces[this.gamedata.color]["O"][1].active
-            ) {
+            if (this.portalPlaceable) {
                 this.portalPlacement.placing = !this.portalPlacement.placing;
                 this.portalPlacement.selected = new Set();
             }
@@ -371,6 +378,7 @@ const Chess = {
             this.gamedata.status = ["finished", ...result];
             let oppositeColor = (this.gamedata.color === "w") ? "b" : "w";
             let winner = (result[0] === "draw") ? "-" : (result[0] === "win") ? this.gamedata.color : oppositeColor;
+            this.resetGameDefaults();
             this.ws.send(JSON.stringify({
                 event: "FIN",
                 code: this.gamedata.code,
@@ -388,6 +396,13 @@ const Chess = {
                 code: this.gamedata.code,
                 color: this.gamedata.color,
             }));
+            this.quitButtons.draw = false;
+        },
+        resetGameDefaults() {
+            this.moves.square = undefined;
+            this.moves.movable.splice(0);
+            this.portalPlacement.placing = false;
+            this.portalPlacement.selected.clear();
         }
     }
 };
