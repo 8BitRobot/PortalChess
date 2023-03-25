@@ -15,6 +15,18 @@ let games = {
         },
         moves: [],
     },
+    "test2": {
+        fen: "k7/8/8/3r4/8/1N6/8/3K4 w - - 0 1",
+        status: {
+            current: "NOT STARTED",
+            result: undefined,
+        },
+        players: {
+            "w": undefined,
+            "b": undefined
+        },
+        moves: [],
+    },
     "abc": {
         fen: "3qk3/2pp4/8/4p3/4P3/8/3P2P1/4KBN1 w - - 0 1",
         status: {

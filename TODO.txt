@@ -1,0 +1,19 @@
+[X] make draw offers functional
+[ ] modify structure of resign/draw buttons and checkboxes
+[ ] if person accidentally quits game, let them rejoin (cookie moment)
+[ ] flip the board for black
+[ ] minor UX tweaks (e.g. cursor pointer)
+[ ] modify piece designs?
+[ ] server connection indicator
+[ ] clock
+[ ] sound effects like lichess
+[X] BUG: green squares for portal selection don't go away when game ends
+[X] BUG: place portals button still toggleable when portals already placed
+[ ] BUG: portal placement on invalid squares?
+[X] BUG: placing a portal that can be captured by a pinned piece causes an error
+[ ] BUG: fonts don't work on bishal's computer
+[X] BUG: pawn captures don't work
+[ ] BUG: client randomly connects and disconnects
+[ ] BUG: black can't start the game when the FEN requires it
+[ ] IDEA: knights can move through portals
+[ ] IDEA: self-capturing portals?

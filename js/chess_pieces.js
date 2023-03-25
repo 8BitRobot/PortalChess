@@ -14,7 +14,14 @@ function checkMovableSquare(piece, list, gameboard, currentPosition, color, skip
     
     gameboard.board[piece.square] = "";
     let boardSquareReference = gameboard.board[currentPosition];
+    let bsrPortalLink;
     let capturedPieceSquare;
+
+    if (boardSquareReference !== "" && boardSquareReference.name === "Portal") {
+        bsrPortalLink = gameboard.board[boardSquareReference.link.square];
+        gameboard.board[boardSquareReference.link.square] = "";
+    }
+    
     if (boardSquareReference !== "") {
         capturedPieceSquare = boardSquareReference.square;
         boardSquareReference.square = -1;
@@ -29,6 +36,9 @@ function checkMovableSquare(piece, list, gameboard, currentPosition, color, skip
     gameboard.board[currentPosition] = piece;
 
     if (!skipKingCheck && gameboard.isAttacked(kingPosition, color === "w" ? "b" : "w")) {
+        if (boardSquareReference !== "" && boardSquareReference.name === "Portal") {
+            gameboard.board[boardSquareReference.link.square] = bsrPortalLink;
+        }
         if (boardSquareReference !== "") {
             boardSquareReference.square = capturedPieceSquare;
         }
@@ -41,6 +51,9 @@ function checkMovableSquare(piece, list, gameboard, currentPosition, color, skip
         return true;
     }
 
+    if (boardSquareReference !== "" && boardSquareReference.name === "Portal") {
+        gameboard.board[boardSquareReference.link.square] = bsrPortalLink;
+    }
     if (boardSquareReference !== "") {
         boardSquareReference.square = capturedPieceSquare;
     }
